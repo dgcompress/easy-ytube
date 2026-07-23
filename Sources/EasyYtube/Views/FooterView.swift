@@ -2,9 +2,11 @@ import SwiftUI
 import AppKit
 
 struct FooterView: View {
+    @ObservedObject private var loc = LocalizationManager.shared
+
     var body: some View {
         VStack(spacing: 6) {
-            Text("Creato da doubleg")
+            Text(L("Creato da doubleg"))
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundStyle(.secondary)
 
@@ -12,7 +14,7 @@ struct FooterView: View {
                 FooterLink(icon: "envelope", label: "gabrielsturzu@gmail.com") {
                     open("mailto:gabrielsturzu@gmail.com")
                 }
-                FooterLink(icon: "heart.fill", label: "Offrimi un caffè", tint: .pink) {
+                FooterLink(icon: "heart.fill", label: L("Offrimi un caffè"), tint: .pink) {
                     open("https://revolut.me/doublegevents")
                 }
                 FooterLink(icon: "globe", label: "doublegevents.it") {
@@ -32,7 +34,7 @@ struct FooterView: View {
 
 private struct FooterLink: View {
     let icon: String
-    let label: LocalizedStringKey
+    let label: String
     var tint: Color = .secondary
     let action: () -> Void
 

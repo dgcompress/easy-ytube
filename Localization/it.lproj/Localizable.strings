@@ -1,0 +1,54 @@
+/* Format picker */
+"FORMATO D'USCITA" = "FORMATO D'USCITA";
+"Cambia…" = "Cambia…";
+"Originale M4A" = "Originale M4A";
+"MP3" = "MP3";
+"MP4" = "MP4";
+"Audio originale, senza conversione" = "Audio originale, senza conversione";
+"Audio compresso, compatibile ovunque" = "Audio compresso, compatibile ovunque";
+"Video con audio incluso" = "Video con audio incluso";
+"Codifica" = "Codifica";
+"Qualità" = "Qualità";
+"Qualità video" = "Qualità video";
+"Massima" = "Massima";
+"Frequenza" = "Frequenza";
+
+/* URL bar / main window */
+"Incolla un link YouTube…" = "Incolla un link YouTube…";
+"Aggiornamento…" = "Aggiornamento…";
+"Aggiorna motore" = "Aggiorna motore";
+"Incolla o trascina un link per iniziare" = "Incolla o trascina un link per iniziare";
+
+/* Update banner */
+"Nuova versione disponibile: v%@" = "Nuova versione disponibile: v%@";
+"Scarica" = "Scarica";
+
+/* Footer */
+"Creato da doubleg" = "Creato da doubleg";
+"Offrimi un caffè" = "Offrimi un caffè";
+
+/* Quick-add popover */
+"Apri finestra completa" = "Apri finestra completa";
+"Esci" = "Esci";
+
+/* Queue item status */
+"In coda" = "In coda";
+"Recupero informazioni…" = "Recupero informazioni…";
+"Completato" = "Completato";
+"Annulla download" = "Annulla download";
+
+/* Duplicate download alert */
+"Hai già scaricato questo brano" = "Hai già scaricato questo brano";
+"\"%@\" risulta già scaricato in precedenza. Vuoi scaricarlo di nuovo?" = "\"%@\" risulta già scaricato in precedenza. Vuoi scaricarlo di nuovo?";
+"Scarica comunque" = "Scarica comunque";
+"Annulla" = "Annulla";
+
+/* File missing alert */
+"File non trovato" = "File non trovato";
+"Il file non è più presente nella cartella di destinazione. Potrebbe essere stato spostato o eliminato." = "Il file non è più presente nella cartella di destinazione. Potrebbe essere stato spostato o eliminato.";
+
+/* Notification */
+"Download completato" = "Download completato";
+
+/* Status bar menu */
+"Apri EasyYtube" = "Apri EasyYtube";

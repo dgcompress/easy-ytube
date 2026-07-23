@@ -3,6 +3,7 @@ import AppKit
 
 struct UpdateBannerView: View {
     @ObservedObject var checker: UpdateChecker
+    @ObservedObject private var loc = LocalizationManager.shared
 
     var body: some View {
         if checker.isAvailable {
@@ -11,7 +12,7 @@ struct UpdateBannerView: View {
                     .foregroundStyle(Color.accentColor)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Nuova versione disponibile: v\(checker.latestVersion)")
+                    Text(String(format: L("Nuova versione disponibile: v%@"), checker.latestVersion))
                         .font(.caption.weight(.semibold))
                     if !checker.notes.isEmpty {
                         Text(checker.notes)
@@ -22,7 +23,7 @@ struct UpdateBannerView: View {
 
                 Spacer()
 
-                Button("Scarica") {
+                Button(L("Scarica")) {
                     if let url = checker.downloadURL {
                         NSWorkspace.shared.open(url)
                     }

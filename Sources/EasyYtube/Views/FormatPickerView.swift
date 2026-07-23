@@ -1,13 +1,17 @@
 import SwiftUI
+import AppKit
 
 struct FormatPickerView: View {
+    @ObservedObject private var loc = LocalizationManager.shared
     @Binding var settings: AudioFormatSettings
     @Binding var destinationFolder: URL
     var onChooseFolder: () -> Void
 
+    @State private var isHoveringChange = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("FORMATO D'USCITA")
+            Text(L("FORMATO D'USCITA"))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
@@ -25,15 +29,16 @@ struct FormatPickerView: View {
             if settings.container == .mp3 {
                 Picker("", selection: $settings.encodingMode) {
                     ForEach(EncodingMode.allCases) { mode in
-                        Text(LocalizedStringKey(mode.rawValue)).tag(mode)
+                        Text(L(mode.rawValue)).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                .id(loc.language)
 
                 HStack(spacing: 16) {
                     if settings.encodingMode == .bitrate {
-                        LabeledPicker(label: "Codifica") {
+                        LabeledPicker(label: L("Codifica")) {
                             Picker("", selection: $settings.bitrateKbps) {
                                 ForEach(AudioFormatSettings.availableBitrates, id: \.self) { kbps in
                                     Text("\(kbps) Kbps").tag(kbps)
@@ -42,10 +47,12 @@ struct FormatPickerView: View {
                             .labelsHidden()
                         }
                     } else {
-                        LabeledPicker(label: "Qualità") {
+                        LabeledPicker(label: L("Qualità")) {
+                            // La scala di libmp3lame è invertita (0=migliore, 9=peggiore);
+                            // qui mostriamo 10=migliore...1=peggiore, più intuitivo.
                             Picker("", selection: $settings.vbrQuality) {
-                                ForEach(0...9, id: \.self) { level in
-                                    Text("\(level)").tag(level)
+                                ForEach(1...10, id: \.self) { displayed in
+                                    Text("\(displayed)").tag(10 - displayed)
                                 }
                             }
                             .labelsHidden()
@@ -54,7 +61,7 @@ struct FormatPickerView: View {
 
                     Spacer()
 
-                    LabeledPicker(label: "Frequenza") {
+                    LabeledPicker(label: L("Frequenza")) {
                         Picker("", selection: $settings.sampleRate) {
                             ForEach(AudioFormatSettings.availableSampleRates, id: \.self) { rate in
                                 Text("\(rate) Hz").tag(rate)
@@ -66,10 +73,10 @@ struct FormatPickerView: View {
             }
 
             if settings.container == .mp4 {
-                LabeledPicker(label: "Qualità video") {
+                LabeledPicker(label: L("Qualità video")) {
                     Picker("", selection: $settings.videoQuality) {
                         ForEach(VideoQuality.allCases) { quality in
-                            Text(LocalizedStringKey(quality.rawValue)).tag(quality)
+                            Text(L(quality.rawValue)).tag(quality)
                         }
                     }
                     .labelsHidden()
@@ -85,9 +92,20 @@ struct FormatPickerView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer()
-                Button("Cambia…", action: onChooseFolder)
+                Button(L("Cambia…"), action: onChooseFolder)
                     .buttonStyle(.borderless)
                     .font(.caption)
+                    .foregroundStyle(isHoveringChange ? Color.accentColor : Color.primary)
+                    .underline(isHoveringChange)
+                    .animation(.easeInOut(duration: 0.12), value: isHoveringChange)
+                    .onHover { hovering in
+                        isHoveringChange = hovering
+                        if hovering {
+                            NSCursor.pointingHand.push()
+                        } else {
+                            NSCursor.pop()
+                        }
+                    }
             }
             .padding(.top, 2)
         }
@@ -98,6 +116,7 @@ struct FormatPickerView: View {
 }
 
 private struct ContainerOptionButton: View {
+    @ObservedObject private var loc = LocalizationManager.shared
     let container: OutputContainer
     let isSelected: Bool
     let action: () -> Void
@@ -105,9 +124,9 @@ private struct ContainerOptionButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Text(LocalizedStringKey(container.rawValue))
+                Text(L(container.rawValue))
                     .font(.system(size: 13, weight: .semibold))
-                Text(LocalizedStringKey(container.caption))
+                Text(L(container.caption))
                     .font(.system(size: 10))
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -128,7 +147,7 @@ private struct ContainerOptionButton: View {
 }
 
 private struct LabeledPicker<Content: View>: View {
-    let label: LocalizedStringKey
+    let label: String
     @ViewBuilder var content: Content
 
     var body: some View {

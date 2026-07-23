@@ -1,9 +1,11 @@
 import SwiftUI
 
 struct QueueItemCard: View {
+    @ObservedObject private var loc = LocalizationManager.shared
     let item: DownloadItem
     var onReveal: () -> Void
     var onRetry: () -> Void
+    var onCancel: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -52,11 +54,11 @@ struct QueueItemCard: View {
     private var statusView: some View {
         switch item.state {
         case .pending:
-            Text("In coda")
+            Text(L("In coda"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .fetchingInfo:
-            Text("Recupero informazioni…")
+            Text(L("Recupero informazioni…"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .downloading(let progress, let speed):
@@ -68,7 +70,7 @@ struct QueueItemCard: View {
                     .foregroundStyle(.secondary)
             }
         case .completed:
-            Label("Completato", systemImage: "checkmark.circle.fill")
+            Label(L("Completato"), systemImage: "checkmark.circle.fill")
                 .font(.caption)
                 .foregroundStyle(.green)
         case .failed(let message):
@@ -82,9 +84,19 @@ struct QueueItemCard: View {
     @ViewBuilder
     private var trailing: some View {
         switch item.state {
-        case .downloading:
-            ProgressView()
-                .controlSize(.small)
+        case .pending, .fetchingInfo, .downloading:
+            HStack(spacing: 8) {
+                if case .downloading = item.state {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help(L("Annulla download"))
+            }
         case .completed:
             Button(action: onReveal) {
                 Image(systemName: "folder")
@@ -95,8 +107,6 @@ struct QueueItemCard: View {
                 Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.borderless)
-        default:
-            EmptyView()
         }
     }
 }

@@ -44,7 +44,8 @@ struct AudioFormatSettings {
     var container: OutputContainer = .mp3
     var encodingMode: EncodingMode = .bitrate
     var bitrateKbps: Int = 320
-    var vbrQuality: Int = 5
+    /// Scala di libmp3lame: 0 = migliore, 9 = peggiore. Di default la migliore qualità.
+    var vbrQuality: Int = 0
     var sampleRate: Int = 48000
     var videoQuality: VideoQuality = .max
 

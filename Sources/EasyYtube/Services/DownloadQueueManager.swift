@@ -16,6 +16,13 @@ final class DownloadQueueManager: ObservableObject {
     private var runningCount = 0
     private var downloadedVideoIDs: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "downloadedVideoIDs") ?? [])
 
+    private struct HistoryEntry: Codable {
+        let videoID: String
+        let title: String
+        let thumbnailURL: String?
+        let filePath: String
+    }
+
     init() {
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser
@@ -24,6 +31,7 @@ final class DownloadQueueManager: ObservableObject {
         self.destinationFolder = folder
 
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        loadHistory()
     }
 
     func addURL(_ rawText: String) {
@@ -48,6 +56,11 @@ final class DownloadQueueManager: ObservableObject {
         }
     }
 
+    func openDestinationFolder() {
+        try? FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(destinationFolder)
+    }
+
     func updateEngine() {
         guard !isUpdatingEngine else { return }
         isUpdatingEngine = true
@@ -58,8 +71,11 @@ final class DownloadQueueManager: ObservableObject {
     }
 
     func revealInFinder(_ item: DownloadItem) {
-        if case .completed(let fileURL) = item.state {
+        guard case .completed(let fileURL) = item.state else { return }
+        if FileManager.default.fileExists(atPath: fileURL.path) {
             NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+        } else {
+            showFileMissingAlert()
         }
     }
 
@@ -68,6 +84,16 @@ final class DownloadQueueManager: ObservableObject {
               case .failed = items[idx].state else { return }
         items[idx].state = .pending
         processQueue()
+    }
+
+    /// Cancels a pending/in-flight download and removes it from the queue —
+    /// used when the user started a download by mistake.
+    func cancel(_ item: DownloadItem) {
+        guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
+        if case .downloading = items[idx].state {
+            service.cancelDownload(id: item.id)
+        }
+        items.remove(at: idx)
     }
 
     // MARK: - Internals
@@ -122,6 +148,7 @@ final class DownloadQueueManager: ObservableObject {
             Task {
                 do {
                     let fileURL = try await service.download(
+                        id: itemID,
                         url: url,
                         settings: settings,
                         destination: destination
@@ -163,6 +190,7 @@ final class DownloadQueueManager: ObservableObject {
                 UserDefaults.standard.set(Array(downloadedVideoIDs), forKey: "downloadedVideoIDs")
             }
             notifyCompletion(title: items[idx].title)
+            saveHistory()
         case .failure(let error):
             items[idx].state = .failed(error.localizedDescription)
         }
@@ -174,21 +202,59 @@ final class DownloadQueueManager: ObservableObject {
         guard downloadedVideoIDs.contains(id) else { return true }
 
         let alert = NSAlert()
-        alert.messageText = NSLocalizedString("Hai già scaricato questo brano", comment: "Duplicate download alert title")
-        let format = NSLocalizedString("\"%@\" risulta già scaricato in precedenza. Vuoi scaricarlo di nuovo?", comment: "Duplicate download alert body")
-        alert.informativeText = String(format: format, title)
+        alert.messageText = L("Hai già scaricato questo brano")
+        alert.informativeText = String(format: L("\"%@\" risulta già scaricato in precedenza. Vuoi scaricarlo di nuovo?"), title)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: NSLocalizedString("Scarica comunque", comment: "Duplicate download alert confirm button"))
-        alert.addButton(withTitle: NSLocalizedString("Annulla", comment: "Duplicate download alert cancel button"))
+        alert.addButton(withTitle: L("Scarica comunque"))
+        alert.addButton(withTitle: L("Annulla"))
         return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func showFileMissingAlert() {
+        let alert = NSAlert()
+        alert.messageText = L("File non trovato")
+        alert.informativeText = L("Il file non è più presente nella cartella di destinazione. Potrebbe essere stato spostato o eliminato.")
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 
     private func notifyCompletion(title: String) {
         let content = UNMutableNotificationContent()
-        content.title = NSLocalizedString("Download completato", comment: "Notification title on download completion")
+        content.title = L("Download completato")
         content.body = title
         content.sound = .default
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+
+    private func loadHistory() {
+        guard let data = UserDefaults.standard.data(forKey: "downloadHistory"),
+              let entries = try? JSONDecoder().decode([HistoryEntry].self, from: data) else { return }
+
+        for entry in entries {
+            guard let webpage = URL(string: "https://www.youtube.com/watch?v=\(entry.videoID)") else { continue }
+            var item = DownloadItem(url: webpage)
+            item.videoID = entry.videoID
+            item.title = entry.title
+            item.thumbnailURL = entry.thumbnailURL.flatMap(URL.init(string:))
+            item.state = .completed(fileURL: URL(fileURLWithPath: entry.filePath))
+            items.append(item)
+        }
+    }
+
+    private func saveHistory() {
+        let entries: [HistoryEntry] = items.compactMap { item in
+            guard case .completed(let fileURL) = item.state, let videoID = item.videoID else { return nil }
+            return HistoryEntry(
+                videoID: videoID,
+                title: item.title,
+                thumbnailURL: item.thumbnailURL?.absoluteString,
+                filePath: fileURL.path
+            )
+        }
+        let capped = Array(entries.suffix(100))
+        if let data = try? JSONEncoder().encode(capped) {
+            UserDefaults.standard.set(data, forKey: "downloadHistory")
+        }
     }
 }

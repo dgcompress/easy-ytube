@@ -2,6 +2,8 @@
 "FORMATO D'USCITA" = "OUTPUT FORMAT";
 "Cambia…" = "Change…";
 "Originale M4A" = "Original M4A";
+"MP3" = "MP3";
+"MP4" = "MP4";
 "Audio originale, senza conversione" = "Original audio, no conversion";
 "Audio compresso, compatibile ovunque" = "Compressed audio, compatible everywhere";
 "Video con audio incluso" = "Video with audio included";
@@ -33,12 +35,17 @@
 "In coda" = "Queued";
 "Recupero informazioni…" = "Fetching info…";
 "Completato" = "Completed";
+"Annulla download" = "Cancel download";
 
 /* Duplicate download alert */
 "Hai già scaricato questo brano" = "You've already downloaded this track";
 "\"%@\" risulta già scaricato in precedenza. Vuoi scaricarlo di nuovo?" = "\"%@\" has already been downloaded before. Do you want to download it again?";
 "Scarica comunque" = "Download anyway";
 "Annulla" = "Cancel";
+
+/* File missing alert */
+"File non trovato" = "File not found";
+"Il file non è più presente nella cartella di destinazione. Potrebbe essere stato spostato o eliminato." = "The file is no longer in the destination folder. It may have been moved or deleted.";
 
 /* Notification */
 "Download completato" = "Download complete";

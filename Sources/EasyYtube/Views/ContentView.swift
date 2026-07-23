@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject private var queue = DownloadQueueManager.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     @StateObject private var updateChecker = UpdateChecker()
     @State private var urlText: String = ""
 
@@ -43,20 +44,22 @@ struct ContentView: View {
                     queue.updateEngine()
                 } label: {
                     Label(
-                        queue.isUpdatingEngine ? "Aggiornamento…" : "Aggiorna motore",
+                        queue.isUpdatingEngine ? L("Aggiornamento…") : L("Aggiorna motore"),
                         systemImage: "arrow.triangle.2.circlepath"
                     )
                     .font(.caption)
                 }
                 .buttonStyle(.borderless)
                 .disabled(queue.isUpdatingEngine)
+
+                LanguagePicker()
             }
 
             URLEntryBar(
                 urlText: $urlText,
                 destinationFolder: queue.destinationFolder,
                 onSubmit: submit,
-                onChooseFolder: queue.chooseDestinationFolder
+                onOpenFolder: queue.openDestinationFolder
             )
         }
         .padding(20)
@@ -73,6 +76,8 @@ struct ContentView: View {
                         queue.revealInFinder(item)
                     }, onRetry: {
                         queue.retry(item)
+                    }, onCancel: {
+                        queue.cancel(item)
                     })
                 }
             }
@@ -85,7 +90,7 @@ struct ContentView: View {
             Image(systemName: "music.note.list")
                 .font(.system(size: 36))
                 .foregroundStyle(.tertiary)
-            Text("Incolla o trascina un link per iniziare")
+            Text(L("Incolla o trascina un link per iniziare"))
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -98,5 +103,20 @@ struct ContentView: View {
         guard !text.isEmpty else { return }
         queue.addURL(text)
         DispatchQueue.main.async { urlText = "" }
+    }
+}
+
+struct LanguagePicker: View {
+    @ObservedObject private var loc = LocalizationManager.shared
+
+    var body: some View {
+        Picker("", selection: $loc.language) {
+            ForEach(AppLanguage.allCases) { lang in
+                Text(lang.displayName).tag(lang)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 90)
     }
 }

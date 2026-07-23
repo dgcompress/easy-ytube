@@ -27,10 +27,12 @@ if [ -f "Resources/AppIcon.icns" ]; then
     cp "Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
 
-if [ -d "Localization/en.lproj" ]; then
-    mkdir -p "$APP_DIR/Contents/Resources/en.lproj"
-    cp Localization/en.lproj/*.strings "$APP_DIR/Contents/Resources/en.lproj/"
-fi
+for lang in it en; do
+    if [ -d "Localization/${lang}.lproj" ]; then
+        mkdir -p "$APP_DIR/Contents/Resources/${lang}.lproj"
+        cp Localization/${lang}.lproj/*.strings "$APP_DIR/Contents/Resources/${lang}.lproj/"
+    fi
+done
 
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

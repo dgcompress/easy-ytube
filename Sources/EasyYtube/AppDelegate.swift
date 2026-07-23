@@ -5,6 +5,7 @@ import SwiftUI
 /// DG Compress: closing the window just hides it instead of quitting the app.
 /// Left-click on the menu bar icon shows a quick-add popover (paste a link
 /// without opening the full window); right-click shows the classic menu.
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
@@ -12,20 +13,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        ProcessInfo.processInfo.disableAutomaticTermination("Resta attiva nella menu bar")
         setupStatusItem()
         setupPopover()
+        attachToMainWindow()
 
-        DispatchQueue.main.async { [weak self] in
-            guard let window = NSApp.windows.first else { return }
-            window.delegate = self
-            window.setFrameAutosaveName("MainWindow")
-            self?.mainWindow = window
+        // Timing of the SwiftUI `Window` scene's NSWindow creation isn't
+        // guaranteed relative to launch; also grab it the first time any
+        // window becomes key, in case it wasn't ready yet above.
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.attachToMainWindow()
         }
+    }
+
+    private func attachToMainWindow() {
+        guard mainWindow == nil, let window = NSApp.windows.first(where: { $0.delegate == nil }) else { return }
+        window.delegate = self
+        window.setFrameAutosaveName("MainWindow")
+        mainWindow = window
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showMainWindow()
         return true
+    }
+
+    /// With a single-window `Window` scene, SwiftUI's default behavior is to quit
+    /// the app once that window closes. We want the menu bar icon to keep it alive.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -89,7 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let menu = NSMenu()
 
         let openItem = NSMenuItem(
-            title: NSLocalizedString("Apri EasyYtube", comment: "Status bar menu: open main window"),
+            title: L("Apri EasyYtube"),
             action: #selector(showMainWindowAction),
             keyEquivalent: ""
         )
@@ -99,7 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(
-            title: NSLocalizedString("Esci", comment: "Status bar menu: quit app"),
+            title: L("Esci"),
             action: #selector(quitAppAction),
             keyEquivalent: "q"
         )

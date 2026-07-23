@@ -2,10 +2,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct URLEntryBar: View {
+    @ObservedObject private var loc = LocalizationManager.shared
     @Binding var urlText: String
     var destinationFolder: URL
     var onSubmit: () -> Void
-    var onChooseFolder: () -> Void
+    var onOpenFolder: () -> Void
     var allowDrop: Bool = true
 
     @State private var isDropTargeted = false
@@ -15,12 +16,12 @@ struct URLEntryBar: View {
             Image(systemName: "link")
                 .foregroundStyle(.secondary)
 
-            TextField("Incolla un link YouTube…", text: $urlText)
+            TextField(L("Incolla un link YouTube…"), text: $urlText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 15))
                 .onSubmit(onSubmit)
 
-            Button(action: onChooseFolder) {
+            Button(action: onOpenFolder) {
                 Image(systemName: "folder")
                     .font(.system(size: 16))
             }

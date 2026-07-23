@@ -2,6 +2,7 @@ import SwiftUI
 
 struct QuickAddView: View {
     @ObservedObject private var queue = DownloadQueueManager.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     @State private var urlText: String = ""
 
     var onOpenMainWindow: () -> Void
@@ -21,25 +22,26 @@ struct QuickAddView: View {
                 urlText: $urlText,
                 destinationFolder: queue.destinationFolder,
                 onSubmit: submit,
-                onChooseFolder: queue.chooseDestinationFolder
+                onOpenFolder: queue.openDestinationFolder
             )
 
             if let last = queue.items.last {
                 QueueItemCard(
                     item: last,
                     onReveal: { queue.revealInFinder(last) },
-                    onRetry: { queue.retry(last) }
+                    onRetry: { queue.retry(last) },
+                    onCancel: { queue.cancel(last) }
                 )
             }
 
             Divider()
 
             HStack {
-                Button("Apri finestra completa", action: onOpenMainWindow)
+                Button(L("Apri finestra completa"), action: onOpenMainWindow)
                     .buttonStyle(.link)
                     .font(.caption)
                 Spacer()
-                Button("Esci", action: onQuit)
+                Button(L("Esci"), action: onQuit)
                     .buttonStyle(.link)
                     .font(.caption)
                     .foregroundStyle(.secondary)

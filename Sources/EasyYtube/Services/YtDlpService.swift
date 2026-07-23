@@ -11,13 +11,24 @@ final class YtDlpService {
     enum ServiceError: Error, LocalizedError {
         case processFailed(String)
         case noResult
+        case cancelled
 
         var errorDescription: String? {
             switch self {
             case .processFailed(let message): return message
             case .noResult: return "Nessun risultato da yt-dlp"
+            case .cancelled: return "Download annullato"
             }
         }
+    }
+
+    private var activeProcesses: [UUID: Process] = [:]
+    private var cancelledIDs: Set<UUID> = []
+
+    /// Terminates the yt-dlp process for a given download, if still running.
+    func cancelDownload(id: UUID) {
+        cancelledIDs.insert(id)
+        activeProcesses[id]?.terminate()
     }
 
     /// Resolves title/thumbnail/URL for a single video or every entry of a playlist,
@@ -59,6 +70,7 @@ final class YtDlpService {
 
     /// Downloads + converts one item, reporting progress (0...1) and current speed string.
     func download(
+        id: UUID,
         url: URL,
         settings: AudioFormatSettings,
         destination: URL,
@@ -93,7 +105,7 @@ final class YtDlpService {
 
         arguments.append(url.absoluteString)
 
-        return try await runWithProgress(arguments: arguments, onProgress: onProgress)
+        return try await runWithProgress(id: id, arguments: arguments, onProgress: onProgress)
     }
 
     private func baseArguments(destination: URL) -> [String] {
@@ -163,6 +175,7 @@ final class YtDlpService {
     }
 
     private func runWithProgress(
+        id: UUID,
         arguments: [String],
         onProgress: @escaping (Double, String) -> Void
     ) async throws -> URL {
@@ -227,11 +240,15 @@ final class YtDlpService {
                 errorOutput += chunk
             }
 
-            process.terminationHandler = { proc in
+            process.terminationHandler = { [weak self] proc in
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
+                self?.activeProcesses[id] = nil
+                let wasCancelled = self?.cancelledIDs.remove(id) != nil
 
-                if proc.terminationStatus == 0, let path = finalPath {
+                if wasCancelled {
+                    continuation.resume(throwing: ServiceError.cancelled)
+                } else if proc.terminationStatus == 0, let path = finalPath {
                     continuation.resume(returning: URL(fileURLWithPath: path))
                 } else if proc.terminationStatus == 0 {
                     continuation.resume(throwing: ServiceError.processFailed("Download completato ma il percorso del file non è stato rilevato"))
@@ -243,6 +260,7 @@ final class YtDlpService {
 
             do {
                 try process.run()
+                activeProcesses[id] = process
             } catch {
                 continuation.resume(throwing: error)
             }
