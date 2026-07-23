@@ -25,7 +25,7 @@ struct FormatPickerView: View {
             if settings.container == .mp3 {
                 Picker("", selection: $settings.encodingMode) {
                     ForEach(EncodingMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
+                        Text(LocalizedStringKey(mode.rawValue)).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -69,7 +69,7 @@ struct FormatPickerView: View {
                 LabeledPicker(label: "Qualità video") {
                     Picker("", selection: $settings.videoQuality) {
                         ForEach(VideoQuality.allCases) { quality in
-                            Text(quality.rawValue).tag(quality)
+                            Text(LocalizedStringKey(quality.rawValue)).tag(quality)
                         }
                     }
                     .labelsHidden()
@@ -105,9 +105,9 @@ private struct ContainerOptionButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Text(container.rawValue)
+                Text(LocalizedStringKey(container.rawValue))
                     .font(.system(size: 13, weight: .semibold))
-                Text(container.caption)
+                Text(LocalizedStringKey(container.caption))
                     .font(.system(size: 10))
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -128,7 +128,7 @@ private struct ContainerOptionButton: View {
 }
 
 private struct LabeledPicker<Content: View>: View {
-    let label: String
+    let label: LocalizedStringKey
     @ViewBuilder var content: Content
 
     var body: some View {

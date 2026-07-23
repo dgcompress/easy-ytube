@@ -1,0 +1,47 @@
+/* Format picker */
+"FORMATO D'USCITA" = "OUTPUT FORMAT";
+"Cambia…" = "Change…";
+"Originale M4A" = "Original M4A";
+"Audio originale, senza conversione" = "Original audio, no conversion";
+"Audio compresso, compatibile ovunque" = "Compressed audio, compatible everywhere";
+"Video con audio incluso" = "Video with audio included";
+"Codifica" = "Bitrate";
+"Qualità" = "Quality";
+"Qualità video" = "Video quality";
+"Massima" = "Max";
+"Frequenza" = "Sample rate";
+
+/* URL bar / main window */
+"Incolla un link YouTube…" = "Paste a YouTube link…";
+"Aggiornamento…" = "Updating…";
+"Aggiorna motore" = "Update engine";
+"Incolla o trascina un link per iniziare" = "Paste or drop a link to get started";
+
+/* Update banner */
+"Nuova versione disponibile: v%@" = "New version available: v%@";
+"Scarica" = "Download";
+
+/* Footer */
+"Creato da doubleg" = "Created by doubleg";
+"Offrimi un caffè" = "Buy me a coffee";
+
+/* Quick-add popover */
+"Apri finestra completa" = "Open full window";
+"Esci" = "Quit";
+
+/* Queue item status */
+"In coda" = "Queued";
+"Recupero informazioni…" = "Fetching info…";
+"Completato" = "Completed";
+
+/* Duplicate download alert */
+"Hai già scaricato questo brano" = "You've already downloaded this track";
+"\"%@\" risulta già scaricato in precedenza. Vuoi scaricarlo di nuovo?" = "\"%@\" has already been downloaded before. Do you want to download it again?";
+"Scarica comunque" = "Download anyway";
+"Annulla" = "Cancel";
+
+/* Notification */
+"Download completato" = "Download complete";
+
+/* Status bar menu */
+"Apri EasyYtube" = "Open EasyYtube";

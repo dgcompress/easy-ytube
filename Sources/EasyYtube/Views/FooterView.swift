@@ -32,7 +32,7 @@ struct FooterView: View {
 
 private struct FooterLink: View {
     let icon: String
-    let label: String
+    let label: LocalizedStringKey
     var tint: Color = .secondary
     let action: () -> Void
 

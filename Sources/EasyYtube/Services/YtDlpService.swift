@@ -1,6 +1,7 @@
 import Foundation
 
 struct VideoInfo {
+    let id: String
     let title: String
     let thumbnailURL: URL?
     let webpageURL: URL
@@ -40,6 +41,7 @@ final class YtDlpService {
                 }
                 let title = (json["title"] as? String) ?? "Video"
                 let thumbnail = (json["thumbnail"] as? String).flatMap(URL.init(string:))
+                let videoID = (json["id"] as? String) ?? url.absoluteString
                 let webpage: URL
                 if let webpageString = json["webpage_url"] as? String, let resolved = URL(string: webpageString) {
                     webpage = resolved
@@ -48,7 +50,7 @@ final class YtDlpService {
                 } else {
                     webpage = url
                 }
-                return VideoInfo(title: title, thumbnailURL: thumbnail, webpageURL: webpage)
+                return VideoInfo(id: videoID, title: title, thumbnailURL: thumbnail, webpageURL: webpage)
             }
 
         guard !infos.isEmpty else { throw ServiceError.noResult }
@@ -77,9 +79,14 @@ final class YtDlpService {
             }
             arguments += ["--postprocessor-args", "ffmpeg:-ar \(settings.sampleRate)"]
         case .mp4:
+            // Preferisce H.264+AAC (compatibile con qualsiasi player/editor, incluso
+            // Premiere); VP9/Opus in mp4 sono validi ma pochissimo supportati fuori
+            // dal browser, quindi restano solo come ultima spiaggia.
             let heightFilter = settings.videoQuality.heightCap.map { "[height<=\($0)]" } ?? ""
+            let compatible = "bestvideo[vcodec^=avc1]\(heightFilter)+bestaudio[acodec^=mp4a]/best[vcodec^=avc1]\(heightFilter)"
+            let fallback = "bestvideo\(heightFilter)+bestaudio/best\(heightFilter)"
             arguments += [
-                "-f", "bestvideo\(heightFilter)+bestaudio/best\(heightFilter)",
+                "-f", "\(compatible)/\(fallback)",
                 "--merge-output-format", "mp4"
             ]
         }

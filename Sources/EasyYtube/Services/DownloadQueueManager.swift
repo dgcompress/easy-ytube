@@ -14,6 +14,7 @@ final class DownloadQueueManager: ObservableObject {
     private let service = YtDlpService()
     private let maxConcurrent = 2
     private var runningCount = 0
+    private var downloadedVideoIDs: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "downloadedVideoIDs") ?? [])
 
     init() {
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
@@ -84,9 +85,15 @@ final class DownloadQueueManager: ObservableObject {
             // Solo il brano del link inserito, mai l'intera playlist anche se l'URL la referenzia.
             if let info = infos.first {
                 items[currentIdx].url = info.webpageURL
+                items[currentIdx].videoID = info.id
                 items[currentIdx].title = info.title
                 items[currentIdx].thumbnailURL = info.thumbnailURL
-                items[currentIdx].state = .pending
+
+                if confirmRedownloadIfNeeded(id: info.id, title: info.title) {
+                    items[currentIdx].state = .pending
+                } else {
+                    items.removeAll { $0.id == itemID }
+                }
             }
         } catch {
             if let currentIdx = items.firstIndex(where: { $0.id == itemID }) {
@@ -151,6 +158,10 @@ final class DownloadQueueManager: ObservableObject {
         switch result {
         case .success(let fileURL):
             items[idx].state = .completed(fileURL: fileURL)
+            if let videoID = items[idx].videoID {
+                downloadedVideoIDs.insert(videoID)
+                UserDefaults.standard.set(Array(downloadedVideoIDs), forKey: "downloadedVideoIDs")
+            }
             notifyCompletion(title: items[idx].title)
         case .failure(let error):
             items[idx].state = .failed(error.localizedDescription)
@@ -159,9 +170,22 @@ final class DownloadQueueManager: ObservableObject {
         processQueue()
     }
 
+    private func confirmRedownloadIfNeeded(id: String, title: String) -> Bool {
+        guard downloadedVideoIDs.contains(id) else { return true }
+
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Hai già scaricato questo brano", comment: "Duplicate download alert title")
+        let format = NSLocalizedString("\"%@\" risulta già scaricato in precedenza. Vuoi scaricarlo di nuovo?", comment: "Duplicate download alert body")
+        alert.informativeText = String(format: format, title)
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: NSLocalizedString("Scarica comunque", comment: "Duplicate download alert confirm button"))
+        alert.addButton(withTitle: NSLocalizedString("Annulla", comment: "Duplicate download alert cancel button"))
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
     private func notifyCompletion(title: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Download completato"
+        content.title = NSLocalizedString("Download completato", comment: "Notification title on download completion")
         content.body = title
         content.sound = .default
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)

@@ -11,6 +11,7 @@ enum DownloadState: Equatable {
 struct DownloadItem: Identifiable, Equatable {
     let id: UUID
     var url: URL
+    var videoID: String?
     var title: String
     var thumbnailURL: URL?
     var state: DownloadState
@@ -18,6 +19,7 @@ struct DownloadItem: Identifiable, Equatable {
     init(url: URL) {
         self.id = UUID()
         self.url = url
+        self.videoID = nil
         self.title = url.absoluteString
         self.thumbnailURL = nil
         self.state = .pending

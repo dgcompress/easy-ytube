@@ -27,6 +27,11 @@ if [ -f "Resources/AppIcon.icns" ]; then
     cp "Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
 
+if [ -d "Localization/en.lproj" ]; then
+    mkdir -p "$APP_DIR/Contents/Resources/en.lproj"
+    cp Localization/en.lproj/*.strings "$APP_DIR/Contents/Resources/en.lproj/"
+fi
+
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -52,6 +57,13 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <true/>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.music</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>it</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>it</string>
+        <string>en</string>
+    </array>
 $( [ -f "Resources/AppIcon.icns" ] && echo "    <key>CFBundleIconFile</key>
     <string>AppIcon</string>" )
 </dict>

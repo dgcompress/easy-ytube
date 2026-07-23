@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let window = NSApp.windows.first else { return }
             window.delegate = self
+            window.setFrameAutosaveName("MainWindow")
             self?.mainWindow = window
         }
     }
@@ -87,13 +88,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         let menu = NSMenu()
 
-        let openItem = NSMenuItem(title: "Apri EasyYtube", action: #selector(showMainWindowAction), keyEquivalent: "")
+        let openItem = NSMenuItem(
+            title: NSLocalizedString("Apri EasyYtube", comment: "Status bar menu: open main window"),
+            action: #selector(showMainWindowAction),
+            keyEquivalent: ""
+        )
         openItem.target = self
         menu.addItem(openItem)
 
         menu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: "Esci", action: #selector(quitAppAction), keyEquivalent: "q")
+        let quitItem = NSMenuItem(
+            title: NSLocalizedString("Esci", comment: "Status bar menu: quit app"),
+            action: #selector(quitAppAction),
+            keyEquivalent: "q"
+        )
         quitItem.target = self
         menu.addItem(quitItem)
 
