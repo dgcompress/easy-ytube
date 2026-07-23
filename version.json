@@ -1,5 +1,5 @@
 {
-  "version": "1.5.0",
-  "url": "https://github.com/dgcompress/easy-ytube/releases/download/v1.5.0/EasyYtube.Installer.pkg",
-  "notes": "BPM più accurato e nei tag ID3, lista download più recente in cima, versione app in basso a destra, fix riapertura finestra dal popover"
+  "version": "1.5.1",
+  "url": "https://github.com/dgcompress/easy-ytube/releases/download/v1.5.1/EasyYtube.Installer.pkg",
+  "notes": "Rilevamento BPM riscritto (spectral flux), BPM anche nel titolo del brano, avviso duplicati solo se il file esiste ancora"
 }
