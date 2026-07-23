@@ -3,12 +3,14 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var queue = DownloadQueueManager()
+    @StateObject private var updateChecker = UpdateChecker()
     @State private var urlText: String = ""
     @State private var isDropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
+            UpdateBannerView(checker: updateChecker)
             FormatPickerView(
                 settings: $queue.formatSettings,
                 destinationFolder: $queue.destinationFolder,
@@ -24,6 +26,10 @@ struct ContentView: View {
         }
         .frame(minWidth: 560, idealWidth: 600, minHeight: 620, idealHeight: 720)
         .background(.regularMaterial)
+        .animation(.easeInOut(duration: 0.25), value: updateChecker.isAvailable)
+        .task {
+            updateChecker.check()
+        }
     }
 
     private var header: some View {
