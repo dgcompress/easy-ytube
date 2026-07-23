@@ -1,0 +1,8 @@
+.build/
+.dmg-staging/
+.pkg-staging/
+Resources/bin/
+*.dmg
+*.pkg
+EasyYtube.app/
+.DS_Store
