@@ -131,6 +131,7 @@ final class DownloadQueueManager: ObservableObject {
 
             let itemID = items[idx].id
             let url = items[idx].url
+            let title = items[idx].title
             items[idx].state = .downloading(progress: 0, speed: "")
             runningCount += 1
 
@@ -142,6 +143,7 @@ final class DownloadQueueManager: ObservableObject {
                     let fileURL = try await service.download(
                         id: itemID,
                         url: url,
+                        title: title,
                         settings: settings,
                         destination: destination
                     ) { [weak self] progress, speed in

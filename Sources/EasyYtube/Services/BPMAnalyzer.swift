@@ -90,9 +90,7 @@ enum BPMAnalyzer {
         let maxLag = min(novelty.count - 1, Int((60.0 / minBPM) * framesPerSecond))
         guard maxLag > minLag else { return nil }
 
-        var bestLag = minLag
-        var bestScore: Float = -.greatestFiniteMagnitude
-        for lag in minLag...maxLag {
+        func correlation(atLag lag: Int) -> Float {
             var score: Float = 0
             var count = 0
             var idx = 0
@@ -101,18 +99,38 @@ enum BPMAnalyzer {
                 count += 1
                 idx += 1
             }
-            guard count > 0 else { continue }
-            score /= Float(count)
+            return count > 0 ? score / Float(count) : 0
+        }
+
+        var bestLag = minLag
+        var bestScore: Float = -.greatestFiniteMagnitude
+        for lag in minLag...maxLag {
+            let score = correlation(atLag: lag)
             if score > bestScore {
                 bestScore = score
                 bestLag = lag
             }
         }
 
+        // Energy-based autocorrelation often locks onto the "half-time"
+        // sub-harmonic: when the kick/bass only accents every other beat, the
+        // strongest periodicity in the novelty curve sits at half the real
+        // tempo. If the candidate at double the tempo (half the lag) is still
+        // a comparably strong peak, prefer it — a real beat at that faster
+        // rate is still clearly present, just slightly weaker, and this app's
+        // typical genres (pop, reggaeton, manele...) are far more often
+        // mis-detected as too slow than too fast.
+        while bestLag / 2 >= minLag {
+            let halfLag = bestLag / 2
+            let halfScore = correlation(atLag: halfLag)
+            guard halfScore >= bestScore * 0.55 else { break }
+            bestLag = halfLag
+            bestScore = halfScore
+        }
+
         var bpm = 60.0 * framesPerSecond / Double(bestLag)
 
-        // Piega ottave/sottottave (metà o doppio tempo hanno spesso correlazione
-        // comparabile) verso l'intervallo di percezione più naturale.
+        // Piega eventuali ottave residue verso l'intervallo di percezione più naturale.
         while bpm < 80 { bpm *= 2 }
         while bpm > 175 { bpm /= 2 }
 

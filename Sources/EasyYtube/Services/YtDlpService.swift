@@ -72,6 +72,7 @@ final class YtDlpService {
     func download(
         id: UUID,
         url: URL,
+        title: String,
         settings: AudioFormatSettings,
         destination: URL,
         onProgress: @escaping (Double, String) -> Void
@@ -111,7 +112,7 @@ final class YtDlpService {
         // sopra tramite --embed-thumbnail, e non ha un BPM da analizzare).
         if settings.container == .mp3 {
             let bpm = BPMAnalyzer.detect(fileURL: fileURL)
-            embedAppCover(fileURL: fileURL, bpm: bpm)
+            embedAppCover(fileURL: fileURL, bpm: bpm, title: title)
             if let bpm {
                 fileURL = (try? appendBPM(bpm, to: fileURL)) ?? fileURL
             }
@@ -134,11 +135,12 @@ final class YtDlpService {
 
     /// Remuxes in the app's own cover art in place of whatever thumbnail yt-dlp
     /// would otherwise have embedded, and (if available) writes the detected BPM
-    /// as a proper ID3 TBPM frame so DJ software (Rekordbox, previews, etc.) can
-    /// read it directly from the file's metadata, not just the filename.
+    /// both as a proper ID3 TBPM frame (for software that reads it, e.g.
+    /// Rekordbox) and appended to the title tag itself (for players/previews
+    /// that only ever surface the title, mirroring the filename suffix).
     /// Best-effort: leaves the file untouched on any failure rather than losing
     /// the download over a cosmetic step.
-    private func embedAppCover(fileURL: URL, bpm: Int?) {
+    private func embedAppCover(fileURL: URL, bpm: Int?, title: String) {
         let tempURL = fileURL.deletingLastPathComponent()
             .appendingPathComponent(fileURL.deletingPathExtension().lastPathComponent + "_cover_tmp")
             .appendingPathExtension(fileURL.pathExtension)
@@ -156,7 +158,7 @@ final class YtDlpService {
             "-disposition:v", "attached_pic"
         ]
         if let bpm {
-            arguments += ["-metadata", "TBPM=\(bpm)"]
+            arguments += ["-metadata", "TBPM=\(bpm)", "-metadata", "title=\(title) \(bpm) bpm"]
         }
         arguments.append(tempURL.path)
 
