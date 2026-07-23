@@ -99,13 +99,26 @@ final class YtDlpService {
             let fallback = "bestvideo\(heightFilter)+bestaudio/best\(heightFilter)"
             arguments += [
                 "-f", "\(compatible)/\(fallback)",
-                "--merge-output-format", "mp4"
+                "--merge-output-format", "mp4",
+                "--embed-thumbnail"
             ]
         }
 
         arguments.append(url.absoluteString)
 
-        return try await runWithProgress(id: id, arguments: arguments, onProgress: onProgress)
+        var fileURL = try await runWithProgress(id: id, arguments: arguments, onProgress: onProgress)
+
+        // Copertina dell'app al posto della miniatura del video, solo per l'audio
+        // (il video tiene la propria, embeddata sopra tramite --embed-thumbnail).
+        if settings.container != .mp4 {
+            embedAppCover(fileURL: fileURL)
+        }
+
+        if let bpm = BPMAnalyzer.detect(fileURL: fileURL) {
+            fileURL = (try? appendBPM(bpm, to: fileURL)) ?? fileURL
+        }
+
+        return fileURL
     }
 
     private func baseArguments(destination: URL) -> [String] {
@@ -115,10 +128,58 @@ final class YtDlpService {
             "--no-playlist",
             "--js-runtimes", "deno:\(BundledTools.denoPath)",
             "--ffmpeg-location", BundledTools.ffmpegPath,
-            "--embed-thumbnail",
             "--add-metadata",
             "-o", destination.appendingPathComponent("%(title)s.%(ext)s").path
         ]
+    }
+
+    /// Remuxes in the app's own cover art in place of whatever thumbnail yt-dlp
+    /// would otherwise have embedded. Best-effort: leaves the file untouched on
+    /// any failure rather than losing the download over a cosmetic step.
+    private func embedAppCover(fileURL: URL) {
+        let tempURL = fileURL.deletingLastPathComponent()
+            .appendingPathComponent(fileURL.deletingPathExtension().lastPathComponent + "_cover_tmp")
+            .appendingPathExtension(fileURL.pathExtension)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: BundledTools.ffmpegPath)
+        process.arguments = [
+            "-y", "-v", "error",
+            "-i", fileURL.path,
+            "-i", BundledTools.coverImagePath,
+            "-map", "0:a",
+            "-map", "1",
+            "-c", "copy",
+            "-id3v2_version", "3",
+            "-metadata:s:v", "title=Album cover",
+            "-metadata:s:v", "comment=Cover (front)",
+            "-disposition:v", "attached_pic",
+            tempURL.path
+        ]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                try? FileManager.default.removeItem(at: tempURL)
+                return
+            }
+            _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: tempURL)
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
+    }
+
+    private func appendBPM(_ bpm: Int, to fileURL: URL) throws -> URL {
+        let ext = fileURL.pathExtension
+        let baseName = fileURL.deletingPathExtension().lastPathComponent
+        let newURL = fileURL.deletingLastPathComponent()
+            .appendingPathComponent("\(baseName) \(bpm) bpm")
+            .appendingPathExtension(ext)
+        try FileManager.default.moveItem(at: fileURL, to: newURL)
+        return newURL
     }
 
     /// Re-downloads the latest yt-dlp release in place (`yt-dlp -U`), keeping the

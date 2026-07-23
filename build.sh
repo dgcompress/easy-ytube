@@ -27,6 +27,10 @@ if [ -f "Resources/AppIcon.icns" ]; then
     cp "Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
 
+if [ -f "Resources/Cover.png" ]; then
+    cp "Resources/Cover.png" "$APP_DIR/Contents/Resources/Cover.png"
+fi
+
 for lang in it en; do
     if [ -d "Localization/${lang}.lproj" ]; then
         mkdir -p "$APP_DIR/Contents/Resources/${lang}.lproj"

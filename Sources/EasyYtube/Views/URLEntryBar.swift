@@ -11,6 +11,10 @@ struct URLEntryBar: View {
 
     @State private var isDropTargeted = false
 
+    private var isSubmitDisabled: Bool {
+        urlText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "link")
@@ -30,12 +34,21 @@ struct URLEntryBar: View {
             .help(destinationFolder.path)
 
             Button(action: onSubmit) {
-                Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 22))
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 14, weight: .bold))
+                    Text(L("Scarica"))
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 11)
+                .background(
+                    Capsule().fill(isSubmitDisabled ? Color.secondary.opacity(0.25) : Color.accentColor)
+                )
+                .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(urlText.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.accentColor)
-            .disabled(urlText.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(isSubmitDisabled)
         }
         .padding(12)
         .background(
