@@ -71,7 +71,7 @@ struct ContentView: View {
                 if queue.items.isEmpty {
                     emptyState
                 }
-                ForEach(queue.items) { item in
+                ForEach(queue.items.reversed()) { item in
                     QueueItemCard(item: item, onReveal: {
                         queue.revealInFinder(item)
                     }, onRetry: {

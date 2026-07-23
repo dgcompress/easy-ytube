@@ -1,25 +1,31 @@
 import Foundation
 
-/// Best-effort BPM (tempo) estimator: decodes a segment of audio to raw PCM via
-/// the bundled ffmpeg, then runs a classic energy-based beat detector (Patin's
-/// algorithm) over it. This is an approximation — like any automatic tempo
-/// detector it can be thrown off by tempo changes, sparse beats, or ambient
-/// tracks — not a substitute for a dedicated DJ/analysis tool.
+/// Best-effort BPM (tempo) estimator: decodes a chunk of audio to raw PCM via
+/// the bundled ffmpeg, builds an onset/novelty curve from its energy, then finds
+/// the dominant beat period by autocorrelating that curve. Autocorrelation looks
+/// at the whole analyzed segment at once rather than picking beats one at a time
+/// off a threshold, so it holds up much better on tracks with uneven dynamics —
+/// but like any lightweight automatic tempo detector it's still an approximation,
+/// not a substitute for a dedicated DJ/analysis tool.
 enum BPMAnalyzer {
+    private static let sampleRate = 22050
+    private static let hopSize = 512 // ~23ms per finestra di energia
+
     static func detect(fileURL: URL) -> Int? {
         guard let samples = decodePCM(fileURL: fileURL) else { return nil }
-        return estimateBPM(samples: samples, sampleRate: 11025)
+        return estimateBPM(samples: samples)
     }
 
     private static func decodePCM(fileURL: URL) -> [Float]? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: BundledTools.ffmpegPath)
-        // Analizza un minuto a partire dai 20s (salta intro/silenzi iniziali spesso privi di beat).
+        // Analizza 90s a partire dai 15s: salta intro/silenzi iniziali spesso privi
+        // di beat e copre una porzione ampia per una stima più stabile.
         process.arguments = [
             "-v", "quiet",
-            "-ss", "20", "-t", "60",
+            "-ss", "15", "-t", "90",
             "-i", fileURL.path,
-            "-ac", "1", "-ar", "11025",
+            "-ac", "1", "-ar", "\(sampleRate)",
             "-f", "f32le", "-"
         ]
 
@@ -38,7 +44,7 @@ enum BPMAnalyzer {
         let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
 
-        guard process.terminationStatus == 0, data.count >= MemoryLayout<Float>.size * 11025 * 5 else {
+        guard process.terminationStatus == 0, data.count >= MemoryLayout<Float>.size * sampleRate * 5 else {
             return nil
         }
 
@@ -48,59 +54,68 @@ enum BPMAnalyzer {
         return samples
     }
 
-    private static func estimateBPM(samples: [Float], sampleRate: Int) -> Int? {
-        let windowSize = 1024
-        var energies: [Float] = []
-        energies.reserveCapacity(samples.count / windowSize)
+    private static func estimateBPM(samples: [Float]) -> Int? {
+        guard samples.count > hopSize * 100 else { return nil }
 
+        // 1. Curva di energia per finestra (~23ms di risoluzione).
+        var energies: [Float] = []
+        energies.reserveCapacity(samples.count / hopSize)
         var i = 0
-        while i + windowSize <= samples.count {
+        while i + hopSize <= samples.count {
             var sum: Float = 0
-            for j in i..<(i + windowSize) {
+            for j in i..<(i + hopSize) {
                 sum += samples[j] * samples[j]
             }
             energies.append(sum)
-            i += windowSize
+            i += hopSize
         }
-        guard energies.count > 50 else { return nil }
+        guard energies.count > 200 else { return nil }
 
-        let windowsPerSecond = Double(sampleRate) / Double(windowSize)
-        let historyLen = max(4, Int(windowsPerSecond))
-        let minGapWindows = max(1, Int(windowsPerSecond * 60.0 / 200.0)) // no faster than 200 BPM
+        // 2. Curva di novelty: solo gli incrementi positivi di energia (probabili
+        // attacchi/beat), che è ciò che l'autocorrelazione deve poi periodicizzare.
+        var novelty = [Float](repeating: 0, count: energies.count)
+        for k in 1..<energies.count {
+            novelty[k] = max(0, energies[k] - energies[k - 1])
+        }
+        let mean = novelty.reduce(0, +) / Float(novelty.count)
+        for k in 0..<novelty.count { novelty[k] -= mean }
 
-        var beatIndices: [Int] = []
-        var lastBeatIndex = -minGapWindows
+        // 3. Autocorrelazione della novelty per ogni lag corrispondente a un
+        // tempo fra 60 e 200 BPM: il lag col punteggio più alto è il periodo
+        // di beat dominante nel brano.
+        let framesPerSecond = Double(sampleRate) / Double(hopSize)
+        let minBPM = 60.0
+        let maxBPM = 200.0
+        let minLag = max(1, Int((60.0 / maxBPM) * framesPerSecond))
+        let maxLag = min(novelty.count - 1, Int((60.0 / minBPM) * framesPerSecond))
+        guard maxLag > minLag else { return nil }
 
-        for idx in historyLen..<energies.count {
-            let history = energies[(idx - historyLen)..<idx]
-            let avg = history.reduce(0, +) / Float(history.count)
-            guard avg > 0 else { continue }
-            let variance = history.reduce(Float(0)) { $0 + ($1 - avg) * ($1 - avg) } / Float(history.count)
-            let sensitivity = (-0.0025714 * variance) + 1.5142857 // Patin's empirical formula
-            let threshold = max(1.05, min(sensitivity, 3.0))
-
-            if energies[idx] > threshold * avg, idx - lastBeatIndex >= minGapWindows {
-                beatIndices.append(idx)
-                lastBeatIndex = idx
+        var bestLag = minLag
+        var bestScore: Float = -.greatestFiniteMagnitude
+        for lag in minLag...maxLag {
+            var score: Float = 0
+            var count = 0
+            var idx = 0
+            while idx + lag < novelty.count {
+                score += novelty[idx] * novelty[idx + lag]
+                count += 1
+                idx += 1
+            }
+            guard count > 0 else { continue }
+            score /= Float(count)
+            if score > bestScore {
+                bestScore = score
+                bestLag = lag
             }
         }
 
-        guard beatIndices.count >= 4 else { return nil }
+        var bpm = 60.0 * framesPerSecond / Double(bestLag)
 
-        let intervalsSeconds = zip(beatIndices, beatIndices.dropFirst())
-            .map { Double($1 - $0) * Double(windowSize) / Double(sampleRate) }
+        // Piega ottave/sottottave (metà o doppio tempo hanno spesso correlazione
+        // comparabile) verso l'intervallo di percezione più naturale.
+        while bpm < 80 { bpm *= 2 }
+        while bpm > 175 { bpm /= 2 }
 
-        var bpmSamples: [Double] = intervalsSeconds.compactMap { interval in
-            guard interval > 0 else { return nil }
-            var bpm = 60.0 / interval
-            while bpm < 70 { bpm *= 2 }
-            while bpm > 180 { bpm /= 2 }
-            return bpm
-        }
-        guard !bpmSamples.isEmpty else { return nil }
-
-        bpmSamples.sort()
-        let median = bpmSamples[bpmSamples.count / 2]
-        return Int(median.rounded())
+        return Int(bpm.rounded())
     }
 }

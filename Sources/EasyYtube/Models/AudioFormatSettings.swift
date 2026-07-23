@@ -1,15 +1,13 @@
 import Foundation
 
 enum OutputContainer: String, CaseIterable, Identifiable {
-    case originalM4A = "Originale M4A"
     case mp3 = "MP3"
-    case mp4 = "MP4"
+    case mp4 = "Video MP4"
 
     var id: String { rawValue }
 
     var caption: String {
         switch self {
-        case .originalM4A: return "Audio originale, senza conversione"
         case .mp3: return "Audio compresso, compatibile ovunque"
         case .mp4: return "Video con audio incluso"
         }

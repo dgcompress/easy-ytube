@@ -5,25 +5,36 @@ struct FooterView: View {
     @ObservedObject private var loc = LocalizationManager.shared
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text(L("Creato da doubleg"))
-                .font(.system(size: 10.5, weight: .medium))
-                .foregroundStyle(.secondary)
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 6) {
+                Text(L("Creato da doubleg"))
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.secondary)
 
-            HStack(spacing: 22) {
-                FooterLink(icon: "envelope", label: "gabrielsturzu@gmail.com") {
-                    open("mailto:gabrielsturzu@gmail.com")
-                }
-                FooterLink(icon: "heart.fill", label: L("Offrimi un caffè"), tint: .pink) {
-                    open("https://revolut.me/doublegevents")
-                }
-                FooterLink(icon: "globe", label: "doublegevents.it") {
-                    open("https://www.doublegevents.it")
+                HStack(spacing: 22) {
+                    FooterLink(icon: "envelope", label: "gabrielsturzu@gmail.com") {
+                        open("mailto:gabrielsturzu@gmail.com")
+                    }
+                    FooterLink(icon: "heart.fill", label: L("Offrimi un caffè"), tint: .pink) {
+                        open("https://revolut.me/doublegevents")
+                    }
+                    FooterLink(icon: "globe", label: "doublegevents.it") {
+                        open("https://www.doublegevents.it")
+                    }
                 }
             }
+            .frame(maxWidth: .infinity)
+
+            Text("v\(appVersion)")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .padding(.trailing, 10)
         }
-        .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
     }
 
     private func open(_ urlString: String) {

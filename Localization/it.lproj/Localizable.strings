@@ -1,10 +1,8 @@
 /* Format picker */
 "FORMATO D'USCITA" = "FORMATO D'USCITA";
 "Cambia…" = "Cambia…";
-"Originale M4A" = "Originale M4A";
 "MP3" = "MP3";
-"MP4" = "MP4";
-"Audio originale, senza conversione" = "Audio originale, senza conversione";
+"Video MP4" = "Video MP4";
 "Audio compresso, compatibile ovunque" = "Audio compresso, compatibile ovunque";
 "Video con audio incluso" = "Video con audio incluso";
 "Codifica" = "Codifica";

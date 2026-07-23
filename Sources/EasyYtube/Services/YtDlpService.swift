@@ -79,8 +79,6 @@ final class YtDlpService {
         var arguments = baseArguments(destination: destination)
 
         switch settings.container {
-        case .originalM4A:
-            arguments += ["-f", "bestaudio[ext=m4a]/bestaudio"]
         case .mp3:
             arguments += ["-x", "--audio-format", "mp3"]
             switch settings.encodingMode {
@@ -108,14 +106,15 @@ final class YtDlpService {
 
         var fileURL = try await runWithProgress(id: id, arguments: arguments, onProgress: onProgress)
 
-        // Copertina dell'app al posto della miniatura del video, solo per l'audio
-        // (il video tiene la propria, embeddata sopra tramite --embed-thumbnail).
-        if settings.container != .mp4 {
-            embedAppCover(fileURL: fileURL)
-        }
-
-        if let bpm = BPMAnalyzer.detect(fileURL: fileURL) {
-            fileURL = (try? appendBPM(bpm, to: fileURL)) ?? fileURL
+        // Copertina dell'app al posto della miniatura del video e tag BPM,
+        // solo per l'audio (il video tiene la propria copertina, embeddata
+        // sopra tramite --embed-thumbnail, e non ha un BPM da analizzare).
+        if settings.container == .mp3 {
+            let bpm = BPMAnalyzer.detect(fileURL: fileURL)
+            embedAppCover(fileURL: fileURL, bpm: bpm)
+            if let bpm {
+                fileURL = (try? appendBPM(bpm, to: fileURL)) ?? fileURL
+            }
         }
 
         return fileURL
@@ -134,16 +133,17 @@ final class YtDlpService {
     }
 
     /// Remuxes in the app's own cover art in place of whatever thumbnail yt-dlp
-    /// would otherwise have embedded. Best-effort: leaves the file untouched on
-    /// any failure rather than losing the download over a cosmetic step.
-    private func embedAppCover(fileURL: URL) {
+    /// would otherwise have embedded, and (if available) writes the detected BPM
+    /// as a proper ID3 TBPM frame so DJ software (Rekordbox, previews, etc.) can
+    /// read it directly from the file's metadata, not just the filename.
+    /// Best-effort: leaves the file untouched on any failure rather than losing
+    /// the download over a cosmetic step.
+    private func embedAppCover(fileURL: URL, bpm: Int?) {
         let tempURL = fileURL.deletingLastPathComponent()
             .appendingPathComponent(fileURL.deletingPathExtension().lastPathComponent + "_cover_tmp")
             .appendingPathExtension(fileURL.pathExtension)
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: BundledTools.ffmpegPath)
-        process.arguments = [
+        var arguments = [
             "-y", "-v", "error",
             "-i", fileURL.path,
             "-i", BundledTools.coverImagePath,
@@ -153,9 +153,16 @@ final class YtDlpService {
             "-id3v2_version", "3",
             "-metadata:s:v", "title=Album cover",
             "-metadata:s:v", "comment=Cover (front)",
-            "-disposition:v", "attached_pic",
-            tempURL.path
+            "-disposition:v", "attached_pic"
         ]
+        if let bpm {
+            arguments += ["-metadata", "TBPM=\(bpm)"]
+        }
+        arguments.append(tempURL.path)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: BundledTools.ffmpegPath)
+        process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 

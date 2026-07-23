@@ -8,6 +8,7 @@ struct URLEntryBar: View {
     var onSubmit: () -> Void
     var onOpenFolder: () -> Void
     var allowDrop: Bool = true
+    var compactButton: Bool = false
 
     @State private var isDropTargeted = false
 
@@ -33,22 +34,32 @@ struct URLEntryBar: View {
             .foregroundStyle(.secondary)
             .help(destinationFolder.path)
 
-            Button(action: onSubmit) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.down")
-                        .font(.system(size: 14, weight: .bold))
-                    Text(L("Scarica"))
-                        .font(.system(size: 14, weight: .semibold))
+            if compactButton {
+                Button(action: onSubmit) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 22))
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 11)
-                .background(
-                    Capsule().fill(isSubmitDisabled ? Color.secondary.opacity(0.25) : Color.accentColor)
-                )
-                .foregroundStyle(.white)
+                .buttonStyle(.plain)
+                .foregroundStyle(isSubmitDisabled ? Color.secondary : Color.accentColor)
+                .disabled(isSubmitDisabled)
+            } else {
+                Button(action: onSubmit) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 14, weight: .bold))
+                        Text(L("Scarica"))
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 11)
+                    .background(
+                        Capsule().fill(isSubmitDisabled ? Color.secondary.opacity(0.25) : Color.accentColor)
+                    )
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .disabled(isSubmitDisabled)
             }
-            .buttonStyle(.plain)
-            .disabled(isSubmitDisabled)
         }
         .padding(12)
         .background(

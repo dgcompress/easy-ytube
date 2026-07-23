@@ -22,7 +22,8 @@ struct QuickAddView: View {
                 urlText: $urlText,
                 destinationFolder: queue.destinationFolder,
                 onSubmit: submit,
-                onOpenFolder: queue.openDestinationFolder
+                onOpenFolder: queue.openDestinationFolder,
+                compactButton: true
             )
 
             if let last = queue.items.last {
@@ -48,7 +49,7 @@ struct QuickAddView: View {
             }
         }
         .padding(16)
-        .frame(width: 340)
+        .frame(width: 400)
     }
 
     private func submit() {
