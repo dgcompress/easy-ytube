@@ -16,13 +16,6 @@ final class DownloadQueueManager: ObservableObject {
     private var runningCount = 0
     private var downloadedVideoIDs: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "downloadedVideoIDs") ?? [])
 
-    private struct HistoryEntry: Codable {
-        let videoID: String
-        let title: String
-        let thumbnailURL: String?
-        let filePath: String
-    }
-
     init() {
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser
@@ -31,7 +24,6 @@ final class DownloadQueueManager: ObservableObject {
         self.destinationFolder = folder
 
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-        loadHistory()
     }
 
     func addURL(_ rawText: String) {
@@ -190,7 +182,6 @@ final class DownloadQueueManager: ObservableObject {
                 UserDefaults.standard.set(Array(downloadedVideoIDs), forKey: "downloadedVideoIDs")
             }
             notifyCompletion(title: items[idx].title)
-            saveHistory()
         case .failure(let error):
             items[idx].state = .failed(error.localizedDescription)
         }
@@ -227,34 +218,4 @@ final class DownloadQueueManager: ObservableObject {
         UNUserNotificationCenter.current().add(request)
     }
 
-    private func loadHistory() {
-        guard let data = UserDefaults.standard.data(forKey: "downloadHistory"),
-              let entries = try? JSONDecoder().decode([HistoryEntry].self, from: data) else { return }
-
-        for entry in entries {
-            guard let webpage = URL(string: "https://www.youtube.com/watch?v=\(entry.videoID)") else { continue }
-            var item = DownloadItem(url: webpage)
-            item.videoID = entry.videoID
-            item.title = entry.title
-            item.thumbnailURL = entry.thumbnailURL.flatMap(URL.init(string:))
-            item.state = .completed(fileURL: URL(fileURLWithPath: entry.filePath))
-            items.append(item)
-        }
-    }
-
-    private func saveHistory() {
-        let entries: [HistoryEntry] = items.compactMap { item in
-            guard case .completed(let fileURL) = item.state, let videoID = item.videoID else { return nil }
-            return HistoryEntry(
-                videoID: videoID,
-                title: item.title,
-                thumbnailURL: item.thumbnailURL?.absoluteString,
-                filePath: fileURL.path
-            )
-        }
-        let capped = Array(entries.suffix(100))
-        if let data = try? JSONEncoder().encode(capped) {
-            UserDefaults.standard.set(data, forKey: "downloadHistory")
-        }
-    }
 }

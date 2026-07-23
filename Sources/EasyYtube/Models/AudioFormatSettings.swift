@@ -1,7 +1,7 @@
 import Foundation
 
 enum OutputContainer: String, CaseIterable, Identifiable {
-    case mp3 = "MP3"
+    case mp3 = "Audio MP3"
     case mp4 = "Video MP4"
 
     var id: String { rawValue }

@@ -1,7 +1,7 @@
 /* Format picker */
 "FORMATO D'USCITA" = "OUTPUT FORMAT";
 "Cambia…" = "Change…";
-"MP3" = "MP3";
+"Audio MP3" = "Audio MP3";
 "Video MP4" = "Video MP4";
 "Audio compresso, compatibile ovunque" = "Compressed audio, compatible everywhere";
 "Video con audio incluso" = "Video with audio included";
