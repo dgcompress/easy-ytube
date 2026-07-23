@@ -1,11 +1,9 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @StateObject private var queue = DownloadQueueManager()
+    @ObservedObject private var queue = DownloadQueueManager.shared
     @StateObject private var updateChecker = UpdateChecker()
     @State private var urlText: String = ""
-    @State private var isDropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -54,32 +52,12 @@ struct ContentView: View {
                 .disabled(queue.isUpdatingEngine)
             }
 
-            HStack(spacing: 10) {
-                Image(systemName: "link")
-                    .foregroundStyle(.secondary)
-                TextField("Incolla un link YouTube…", text: $urlText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 15))
-                    .onSubmit(submit)
-                Button(action: submit) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 22))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(urlText.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary : Color.accentColor)
-                .disabled(urlText.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(.background.opacity(0.6))
+            URLEntryBar(
+                urlText: $urlText,
+                destinationFolder: queue.destinationFolder,
+                onSubmit: submit,
+                onChooseFolder: queue.chooseDestinationFolder
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: isDropTargeted ? 2 : 1)
-            )
-            .animation(.easeInOut(duration: 0.15), value: isDropTargeted)
-            .onDrop(of: [.url, .plainText], isTargeted: $isDropTargeted, perform: handleDrop)
         }
         .padding(20)
     }
@@ -120,27 +98,5 @@ struct ContentView: View {
         guard !text.isEmpty else { return }
         queue.addURL(text)
         DispatchQueue.main.async { urlText = "" }
-    }
-
-    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
-
-        if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url else { return }
-                DispatchQueue.main.async { queue.addURL(url.absoluteString) }
-            }
-            return true
-        }
-
-        if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
-            _ = provider.loadObject(ofClass: NSString.self) { text, _ in
-                guard let text = text as? String else { return }
-                DispatchQueue.main.async { queue.addURL(text) }
-            }
-            return true
-        }
-
-        return false
     }
 }

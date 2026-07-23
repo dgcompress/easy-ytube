@@ -4,6 +4,8 @@ import UserNotifications
 
 @MainActor
 final class DownloadQueueManager: ObservableObject {
+    static let shared = DownloadQueueManager()
+
     @Published var items: [DownloadItem] = []
     @Published var formatSettings = AudioFormatSettings()
     @Published var destinationFolder: URL
