@@ -31,7 +31,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func attachToMainWindow() {
-        guard mainWindow == nil, let window = NSApp.windows.first(where: { $0.delegate == nil }) else { return }
+        // Matching on `delegate == nil` used to miss the window whenever SwiftUI
+        // had already assigned its own internal delegate by the time this ran
+        // (timing-dependent) — when that happened, our `windowShouldClose`
+        // override (which hides instead of closing) never took effect, so the
+        // window was genuinely destroyed on close with no way to bring it back.
+        // Matching on the window's title (set in App.swift) is reliable regardless.
+        guard mainWindow == nil, let window = NSApp.windows.first(where: { $0.title == "EasyYtube" }) else { return }
         window.delegate = self
         window.setFrameAutosaveName("MainWindow")
         mainWindow = window
@@ -139,7 +145,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func showMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        mainWindow?.makeKeyAndOrderFront(nil)
+        if let mainWindow {
+            mainWindow.makeKeyAndOrderFront(nil)
+        } else {
+            // The window was fully closed rather than hidden (or we haven't
+            // attached to it yet) — ask SwiftUI to (re)create it.
+            WindowOpener.shared.openMainWindow?()
+        }
     }
 
     private func quitApp() {

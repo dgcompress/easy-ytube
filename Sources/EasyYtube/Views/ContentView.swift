@@ -4,6 +4,7 @@ struct ContentView: View {
     @ObservedObject private var queue = DownloadQueueManager.shared
     @ObservedObject private var loc = LocalizationManager.shared
     @StateObject private var updateChecker = UpdateChecker()
+    @Environment(\.openWindow) private var openWindow
     @State private var urlText: String = ""
 
     var body: some View {
@@ -28,6 +29,9 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.25), value: updateChecker.isAvailable)
         .task {
             updateChecker.check()
+        }
+        .onAppear {
+            WindowOpener.shared.openMainWindow = { openWindow(id: "main") }
         }
     }
 
