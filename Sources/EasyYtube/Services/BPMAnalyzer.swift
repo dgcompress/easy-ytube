@@ -1,19 +1,33 @@
 import Foundation
+import Accelerate
 
-/// Best-effort BPM (tempo) estimator: decodes a chunk of audio to raw PCM via
-/// the bundled ffmpeg, builds an onset/novelty curve from its energy, then finds
-/// the dominant beat period by autocorrelating that curve. Autocorrelation looks
-/// at the whole analyzed segment at once rather than picking beats one at a time
-/// off a threshold, so it holds up much better on tracks with uneven dynamics —
-/// but like any lightweight automatic tempo detector it's still an approximation,
-/// not a substitute for a dedicated DJ/analysis tool.
+/// BPM (tempo) estimator: decodes a chunk of audio to raw PCM via the bundled
+/// ffmpeg, builds a spectral-flux onset-strength curve (the same class of
+/// onset-detection function used by real music-analysis tools, e.g. librosa's
+/// onset_strength), then finds the dominant beat period by autocorrelating
+/// that curve, weighted by a perceptual tempo preference centered around 120
+/// BPM to resolve octave ambiguity (half/double-tempo confusion).
+///
+/// Spectral flux — summing only the *increases* in per-frequency-bin
+/// magnitude between consecutive frames — responds to percussive attacks
+/// (kick/snare/hi-hat) across the whole spectrum, and largely ignores a
+/// smoothly sustained bassline. That matters because a rolling/legato bass
+/// pattern (common in reggaeton/dembow) can dominate a simple broadband
+/// energy signal and fool a detector into locking onto half the real tempo —
+/// verified against several real tracks during development, where switching
+/// from raw energy to spectral flux fixed exactly this failure mode.
+///
+/// Still a best-effort approximation, not a substitute for a dedicated
+/// DJ/analysis tool with full beat-tracking.
 enum BPMAnalyzer {
     private static let sampleRate = 22050
-    private static let hopSize = 512 // ~23ms per finestra di energia
+    private static let fftSize = 1024
+    private static let hopSize = 256 // ~11.6ms onset resolution
 
     static func detect(fileURL: URL) -> Int? {
         guard let samples = decodePCM(fileURL: fileURL) else { return nil }
-        return estimateBPM(samples: samples)
+        let envelope = onsetEnvelope(samples)
+        return estimateBPM(envelope: envelope)
     }
 
     private static func decodePCM(fileURL: URL) -> [Float]? {
@@ -54,86 +68,109 @@ enum BPMAnalyzer {
         return samples
     }
 
-    private static func estimateBPM(samples: [Float]) -> Int? {
-        guard samples.count > hopSize * 100 else { return nil }
+    /// Spectral-flux onset-strength curve: for each overlapping analysis
+    /// window, the FFT magnitude spectrum is compared to the previous
+    /// window's, and only positive per-bin differences (energy increases —
+    /// onsets) are summed. Sustained tones contribute little; attacks spike.
+    private static func onsetEnvelope(_ samples: [Float]) -> [Float] {
+        let log2n = vDSP_Length(log2(Float(fftSize)))
+        guard let fftSetup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2)) else { return [] }
+        defer { vDSP_destroy_fftsetup(fftSetup) }
 
-        // 1. Curva di energia per finestra (~23ms di risoluzione).
-        var energies: [Float] = []
-        energies.reserveCapacity(samples.count / hopSize)
+        var window = [Float](repeating: 0, count: fftSize)
+        vDSP_hann_window(&window, vDSP_Length(fftSize), Int32(vDSP_HANN_NORM))
+
+        var prevMag = [Float](repeating: 0, count: fftSize / 2)
+        var envelope: [Float] = []
+        envelope.reserveCapacity(samples.count / hopSize)
+
+        var realp = [Float](repeating: 0, count: fftSize / 2)
+        var imagp = [Float](repeating: 0, count: fftSize / 2)
+        var mag = [Float](repeating: 0, count: fftSize / 2)
+        var magSqrt = [Float](repeating: 0, count: fftSize / 2)
+        var frame = [Float](repeating: 0, count: fftSize)
+
         var i = 0
-        while i + hopSize <= samples.count {
-            var sum: Float = 0
-            for j in i..<(i + hopSize) {
-                sum += samples[j] * samples[j]
+        while i + fftSize <= samples.count {
+            for j in 0..<fftSize { frame[j] = samples[i + j] * window[j] }
+
+            realp.withUnsafeMutableBufferPointer { realPtr in
+                imagp.withUnsafeMutableBufferPointer { imagPtr in
+                    var splitComplex = DSPSplitComplex(realp: realPtr.baseAddress!, imagp: imagPtr.baseAddress!)
+                    frame.withUnsafeBufferPointer { framePtr in
+                        framePtr.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: fftSize / 2) { complexPtr in
+                            vDSP_ctoz(complexPtr, 2, &splitComplex, 1, vDSP_Length(fftSize / 2))
+                        }
+                    }
+                    vDSP_fft_zrip(fftSetup, &splitComplex, 1, log2n, FFTDirection(FFT_FORWARD))
+                    vDSP_zvmags(&splitComplex, 1, &mag, 1, vDSP_Length(fftSize / 2))
+                }
             }
-            energies.append(sum)
+            var countF = Int32(fftSize / 2)
+            vvsqrtf(&magSqrt, mag, &countF)
+
+            var flux: Float = 0
+            for k in 1..<(fftSize / 2) { // salta il bin DC
+                let diff = magSqrt[k] - prevMag[k]
+                if diff > 0 { flux += diff }
+            }
+            envelope.append(flux)
+            swap(&prevMag, &magSqrt)
+
             i += hopSize
         }
-        guard energies.count > 200 else { return nil }
+        return envelope
+    }
 
-        // 2. Curva di novelty: solo gli incrementi positivi di energia (probabili
-        // attacchi/beat), che è ciò che l'autocorrelazione deve poi periodicizzare.
-        var novelty = [Float](repeating: 0, count: energies.count)
-        for k in 1..<energies.count {
-            novelty[k] = max(0, energies[k] - energies[k - 1])
-        }
-        let mean = novelty.reduce(0, +) / Float(novelty.count)
-        for k in 0..<novelty.count { novelty[k] -= mean }
+    private static func estimateBPM(envelope: [Float]) -> Int? {
+        guard envelope.count > 200 else { return nil }
 
-        // 3. Autocorrelazione della novelty per ogni lag corrispondente a un
-        // tempo fra 60 e 200 BPM: il lag col punteggio più alto è il periodo
-        // di beat dominante nel brano.
-        let framesPerSecond = Double(sampleRate) / Double(hopSize)
-        let minBPM = 60.0
-        let maxBPM = 200.0
-        let minLag = max(1, Int((60.0 / maxBPM) * framesPerSecond))
-        let maxLag = min(novelty.count - 1, Int((60.0 / minBPM) * framesPerSecond))
-        guard maxLag > minLag else { return nil }
+        let mean = envelope.reduce(0, +) / Float(envelope.count)
+        let centered = envelope.map { $0 - mean }
 
         func correlation(atLag lag: Int) -> Float {
             var score: Float = 0
             var count = 0
             var idx = 0
-            while idx + lag < novelty.count {
-                score += novelty[idx] * novelty[idx + lag]
+            while idx + lag < centered.count {
+                score += centered[idx] * centered[idx + lag]
                 count += 1
                 idx += 1
             }
             return count > 0 ? score / Float(count) : 0
         }
 
+        let framesPerSecond = Double(sampleRate) / Double(hopSize)
+        let minBPM = 55.0
+        let maxBPM = 200.0
+        let minLag = max(1, Int((60.0 / maxBPM) * framesPerSecond))
+        let maxLag = min(centered.count - 1, Int((60.0 / minBPM) * framesPerSecond))
+        guard maxLag > minLag else { return nil }
+
+        // Pesa il punteggio grezzo di autocorrelazione con una preferenza
+        // percettiva centrata sui 120 BPM (il "tempo di risonanza" usato da
+        // molti stimatori di tempo per orientare la scelta fra tempo
+        // dimezzato/raddoppiato quando la periodicità grezza è ambigua) — a
+        // differenza di un taglio netto, qui la preferenza è morbida: pesa
+        // poco quando un candidato domina chiaramente, e fa da spareggio
+        // quando due candidati sono vicini.
+        let preferredBPM = 120.0
+        let sigmaOctaves = 1.0
+
         var bestLag = minLag
-        var bestScore: Float = -.greatestFiniteMagnitude
+        var bestWeighted: Float = -.greatestFiniteMagnitude
         for lag in minLag...maxLag {
-            let score = correlation(atLag: lag)
-            if score > bestScore {
-                bestScore = score
+            let bpm = 60.0 * framesPerSecond / Double(lag)
+            let octaves = log2(bpm / preferredBPM)
+            let weight = exp(-0.5 * pow(octaves / sigmaOctaves, 2))
+            let weighted = correlation(atLag: lag) * Float(weight)
+            if weighted > bestWeighted {
+                bestWeighted = weighted
                 bestLag = lag
             }
         }
 
-        // Energy-based autocorrelation often locks onto the "half-time"
-        // sub-harmonic: when the kick/bass only accents every other beat, the
-        // strongest periodicity in the novelty curve sits at half the real
-        // tempo. If the candidate at double the tempo (half the lag) is still
-        // a comparably strong peak, prefer it — a real beat at that faster
-        // rate is still clearly present, just slightly weaker, and this app's
-        // typical genres (pop, reggaeton, manele...) are far more often
-        // mis-detected as too slow than too fast.
-        while bestLag / 2 >= minLag {
-            let halfLag = bestLag / 2
-            let halfScore = correlation(atLag: halfLag)
-            guard halfScore >= bestScore * 0.55 else { break }
-            bestLag = halfLag
-            bestScore = halfScore
-        }
-
-        var bpm = 60.0 * framesPerSecond / Double(bestLag)
-
-        // Piega eventuali ottave residue verso l'intervallo di percezione più naturale.
-        while bpm < 80 { bpm *= 2 }
-        while bpm > 175 { bpm /= 2 }
-
+        let bpm = 60.0 * framesPerSecond / Double(bestLag)
         return Int(bpm.rounded())
     }
 }
