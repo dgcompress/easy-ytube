@@ -14,7 +14,10 @@ final class DownloadQueueManager: ObservableObject {
     private let service = YtDlpService()
     private let maxConcurrent = 2
     private var runningCount = 0
-    private var downloadedVideoIDs: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "downloadedVideoIDs") ?? [])
+    /// videoID -> file path of the last download, used to only warn about a
+    /// duplicate download when that file is still actually on disk (not just
+    /// "was downloaded at some point" — the user may have deleted it since).
+    private var downloadedFilePaths: [String: String] = (UserDefaults.standard.dictionary(forKey: "downloadedFilePaths") as? [String: String]) ?? [:]
 
     init() {
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
@@ -180,8 +183,8 @@ final class DownloadQueueManager: ObservableObject {
         case .success(let fileURL):
             items[idx].state = .completed(fileURL: fileURL)
             if let videoID = items[idx].videoID {
-                downloadedVideoIDs.insert(videoID)
-                UserDefaults.standard.set(Array(downloadedVideoIDs), forKey: "downloadedVideoIDs")
+                downloadedFilePaths[videoID] = fileURL.path
+                UserDefaults.standard.set(downloadedFilePaths, forKey: "downloadedFilePaths")
             }
             notifyCompletion(title: items[idx].title)
         case .failure(let error):
@@ -192,7 +195,7 @@ final class DownloadQueueManager: ObservableObject {
     }
 
     private func confirmRedownloadIfNeeded(id: String, title: String) -> Bool {
-        guard downloadedVideoIDs.contains(id) else { return true }
+        guard let path = downloadedFilePaths[id], FileManager.default.fileExists(atPath: path) else { return true }
 
         let alert = NSAlert()
         alert.messageText = L("Hai già scaricato questo brano")
